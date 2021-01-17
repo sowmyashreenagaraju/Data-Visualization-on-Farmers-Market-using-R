@@ -1,0 +1,415 @@
+---
+title: "Farmers Market"
+author: "Sowmya Shree Nagaraju"
+date: "2/20/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+
+```{r message=FALSE, warning=FALSE}
+library(lubridate)
+library(anytime)
+library(dplyr)
+library(ggplot2)
+library(usmap)
+library(ggmap)
+library(plotly)
+library(maps)
+library(stringr)
+library(plyr)
+library(treemap)
+library(tidyr)
+library(patchwork)
+library(gridExtra)
+library(reshape2)
+
+fmarket<-read.csv("/Users/sowmyageet/Downloads/fmarket.csv")
+RegionMapping<-read.csv("/Users/sowmyageet/Downloads/RegionMapping.csv")
+region<-merge(fmarket,RegionMapping, by.x = "State", by.y = "State")
+```
+
+Number of Farmers Market in each state in the United States as of 2020
+
+```{r}
+df<-fmarket%>%group_by(State)%>%
+          dplyr::summarise(Number_of_Markets = n())%>%
+                 arrange((Number_of_Markets))%>%drop_na()
+df
+rm(df)
+```
+
+Region wise Farmers Market
+
+```{r}
+df<-region%>%group_by(State,Region)%>%
+          dplyr::summarise(Number_of_Markets = n())%>%
+                 arrange((Number_of_Markets))%>%drop_na()
+df
+rm(df)
+```
+
+Distribution of Farmers Market across US as of 2020
+
+```{r}
+df<-fmarket%>%group_by(State)%>%
+          dplyr::summarise(Number_of_Markets = n())%>%
+                 arrange((Number_of_Markets))%>%drop_na()
+
+usa_maps<-map_data("state")
+df$region<-tolower(df$State)
+
+df<-left_join(usa_maps, df)
+
+p<-ggplot(data = df, aes(x = long, y= lat, group = group, fill= Number_of_Markets)) +
+   geom_polygon(color = "black", size = 0.1) + 
+   coord_map(projection = "albers", lat0 = 39, lat1 = 45)
+
+p + labs(title = "Market distribution across the US") + labs(fill = "Density") +
+    scale_fill_gradient(low = "white", high = "#CB454A") + theme_light()+
+    theme(plot.title = element_text(family="Times New Roman", 
+                                    face="bold.italic",
+                                    color="black",
+                                    size=16))
+
+ggsave("dist_map.png", device="png", dpi = 1000)
+rm(p,df)
+```
+
+```{r}
+df<-region%>%group_by(Region)%>%
+             dplyr::summarise(count = n())
+
+ggplot(data = df, aes(x=reorder(Region,count),y=count)) +
+  geom_bar(stat="identity", position = "dodge", fill='darkgoldenrod3') +
+  labs(x="Regions",y="Farmers market",title="Farmers Markets in US regions") +
+  geom_text(aes(label = df$count), vjust = 0.5, position = position_stack(vjust = 1.05)) +
+  theme_light()+theme(plot.title = element_text(family="Times New Roman", 
+                                                face="bold.italic",color="black",size=16), 
+                                                text = element_text(family="Times New Roman",face="bold.italic",
+                                                color="black",size=14))
+
+ggsave("region_US.png", device="png", dpi = 1000)
+rm(df)
+```
+
+Evolution of farmers market by year(assuming season date as the starting date of the market)
+```{r}
+fmarket$started_year<-anydate(fmarket$updateTime)
+fmarket$started_year<-format(as.Date(fmarket$started_year, format="%Y-%m-%d"), "%Y")
+
+df<-fmarket%>%group_by(started_year)%>%
+                dplyr::summarise(no_markets = n())%>%drop_na()
+df$no_markets<-cumsum(df$no_markets)
+df
+ggplot(data = df, aes(x=df$started_year,y=df$no_markets)) + 
+  geom_bar(stat = "identity", fill="dodgerblue4") + theme_light() +
+   geom_text(aes(label = df$no_markets), vjust = 0.5, position = position_stack(vjust = 1.07)) +
+     xlab("Year") + ylab("Number of markets") + 
+       ggtitle("Growth of Farmers market") +
+        theme(plot.title = element_text(family="Times New Roman", 
+                                        face="bold.italic",color="black",size=16), 
+                                        text = element_text(family="Times New Roman", 
+                                        face="bold.italic",color="black",size=14))
+
+ggsave("market_vs_year.png", device="png", dpi = 1000)
+rm(df)
+```
+
+Number of Farmers Market growth in the each state of US each year
+
+```{r}
+df<-fmarket%>%group_by(State,started_year)%>%
+              dplyr::summarise(number_markets = n())%>%drop_na()
+df$number_markets<-ave(df$number_markets,df$State, FUN = cumsum)
+df
+group_1<-df[c(1:88),]
+group_2<-df[c(89:190),]
+group_3<-df[c(191:287),]
+group_4<-df[c(288:408),]
+
+
+ggplot(group_1,aes(x=factor(started_year),y=number_markets)) + 
+      facet_wrap(~State) + geom_bar(stat = "identity", fill="blue") +
+      xlab("Year") + ylab("Number of Markets") + coord_flip()+theme_light() +
+      theme(plot.title = element_text(family="Times New Roman", 
+                                      face="bold.italic",color="black",size=16), 
+                                      text = element_text(family="Times New Roman", 
+                                      face="bold.italic",color="black",size=12))
+ggsave("market_vs_state1.png", device="png", dpi = 1000)
+
+
+ggplot(group_2,aes(x=factor(started_year),y=number_markets)) + 
+      facet_wrap(~State) + geom_bar(stat = "identity", fill="blue") +
+      xlab("Year") + ylab("Number of Markets") + coord_flip()+theme_light()+
+      theme(plot.title = element_text(family="Times New Roman", 
+                                      face="bold.italic",color="black",size=16), 
+                                      text = element_text(family="Times New Roman", 
+                                      face="bold.italic",color="black",size=12))
+ggsave("market_vs_state2.png", device="png", dpi = 1000)
+
+
+ggplot(group_3,aes(x=factor(started_year),y=number_markets)) + 
+      facet_wrap(~State) + geom_bar(stat = "identity", fill="blue") +
+      xlab("Year") + ylab("Number of Markets") + coord_flip()+theme_light()+
+      theme(plot.title = element_text(family="Times New Roman", 
+                                      face="bold.italic",color="black",size=16), 
+                                      text = element_text(family="Times New Roman",
+                                                          face="bold.italic",color="black",size=12))
+
+ggsave("market_vs_state3.png", device="png", dpi = 1000)
+
+
+ggplot(group_4,aes(x=factor(started_year),y=number_markets)) + 
+      facet_wrap(~State) + geom_bar(stat = "identity", fill="blue") +
+      xlab("Year") + ylab("Number of Markets") + coord_flip()+theme_light()+
+      theme(plot.title = element_text(family="Times New Roman", 
+                                      face="bold.italic",color="black",size=16), 
+                                      text = element_text(family="Times New Roman",
+                                                          face="bold.italic",color="black",size=12))
+
+ggsave("market_vs_state4.png", device="png", dpi = 1000)
+
+rm(df,group_1,group_2,group_3,group_4)
+```
+
+Products
+
+Percentage of each produce available/sold in Farmers market across US assuming no specified as NOT SELLING
+
+```{r}
+df<-fmarket[,c(29:58)]
+
+df1<-ldply(df,function(c) sum(c=="Y"| c=="y"))%>%
+     mutate(percent = round((V1/length(df$Organic)*100)))%>%arrange(desc(V1))
+df1$label<-paste(df1$.id,df1$percent,"%")
+df1
+#Tree map
+treemap(df1, index = c("label"), vSize = "V1", type = "index", title = "Product Summary")
+# Bar chart
+ggplot(df1, aes(x=reorder(.id,-V1,sum),y=V1))+
+  geom_bar(stat = "identity", fill="slateblue") + 
+  xlab("Products") + ylab("Number of farmers markets")+ 
+  coord_flip()+theme_light()+
+  labs(title = "Product summary in farmers market")+theme_light()+
+  theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16))
+
+ggsave("products_bargraph.png", device="png", dpi = 1000)
+
+rm(df,df1)
+```
+
+Each year how many of each products available in the farmaers market
+
+```{r}
+df<-fmarket[,c(29:60)]
+df<-df[,c(-31)]
+df<-df[!(is.na(df$started_year)),]
+df<-df[!(df$started_year=="2020"),]
+df1<-df%>%group_by(started_year)%>%dplyr::summarise_each(function(c) sum(c=="Y"| c=="y"))
+df2<-melt(df1, id.vars = c("started_year"))
+df2[2]<-as.character(df2$variable)
+ggplot(data = df2,aes(x=started_year,y=variable,fill=value))+geom_tile()+labs(x="Year",y="Products")
+ggsave("products_year.png", device="png", dpi = 1000)
+rm(df,df1,df2)
+```
+
+Trend line of organic products and number of new markets registered each year
+
+```{r}
+
+df<-fmarket[,c(29,60)]
+df<-ddply(df,.(df$started_year,df$Organic),nrow)
+colnames(df)<-c("started_year","organic","count")
+df<-df[!(df$started_year=="2020"),]
+df$count<-ave(df$count,df$organic,FUN=cumsum)
+df<-arrange(df,organic)
+
+
+
+ggplot(df,aes(x=started_year,y=count,group=organic, color=organic)) + geom_line()+geom_point() +
+              labs(x="Year",y="Number of markets selling organic",
+                   title = "Growth of organic products through years") + theme_light()+
+                   theme(plot.title = element_text(family="Times New Roman",                                                                                                      face="bold.italic",color="black",size=16),
+                         text = element_text(family="Times New Roman", 
+                                             face="bold.italic",color="black",size=14))
+ggsave("organic1.png", device="png", dpi = 1000)
+
+# Market growth
+df1<-fmarket%>%group_by(started_year)%>%
+                dplyr::summarise(no_markets = n())%>%drop_na()
+df1<-df1[!(df1$started_year=="2020"),]
+
+ggplot(data = df1,aes(x=started_year,y=no_markets, group=1)) + geom_line() + geom_point() +
+                labs(x="Year",y="Number of Markets", 
+                     title = "Number of new markets registered each year")+
+                    theme(plot.title = element_text(family="Times New Roman",
+                                                    face="bold.italic",color="black",size=16), 
+                          text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("organic2.png", device="png", dpi = 1000)
+
+rm(df,df1)
+```
+
+Payment type accepted
+
+```{r}
+payment_grp<-fmarket[,c(24:28)]
+df1<-ldply(payment_grp, function(c) sum(c=="Y"| c=="y"))%>%
+           mutate(percent = round((V1/length(payment_grp$Credit))*100))
+df1$label<-paste(df1$percent,"%")
+
+ggplot(df1, aes(x=reorder(.id, -V1, sum), y= V1))+ geom_bar(stat = "identity",fill="dodgerblue") + 
+  geom_text(aes(label = df1$label), vjust = 0.5, position = position_stack(vjust = 1.07))+
+  labs(x="Payment types", y="Number of markets",title ="Payment type in Total farmers market ")+
+  theme_light()+theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16))
+
+ggsave("Payment1.png", device="png", dpi = 1000)
+
+```
+
+Year wise payment type accepted/not accepted out of 8971 markets
+
+```{r}
+#Credit
+df<-fmarket[,c(24,60)]
+df<-df[!(is.na(df$started_year)),]
+df<-df[!(df$started_year=="2020"),]
+df<-ddply(df,.(df$started_year,df$Credit),nrow)
+colnames(df)<-c("Year", "Credit", "V1")
+df$V1<-ave(df$V1,df$Credit,FUN=cumsum)
+par(mfrow=c(2,2))
+ggplot(df,aes(x=Year,y=V1,fill=Credit))+geom_bar(position = "dodge",stat="identity")+
+      labs(y="Number of markets",title = "Number of markets that accept credit as payment type")+
+      theme_light()+theme(plot.title = element_text(family="Times New Roman", 
+                                                    face="bold.italic",color="black",size=16),
+                          text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("Payment1.png", device="png", dpi = 1000)
+
+# WIC
+df<-fmarket[,c(25,60)]
+df<-df[!(is.na(df$started_year)),]
+df<-df[!(df$started_year=="2020"),]
+df<-ddply(df,.(df$started_year,df$WIC),nrow)
+colnames(df)<-c("Year", "WIC", "V1")
+df$V1<-ave(df$V1,df$WIC,FUN=cumsum)
+ggplot(df,aes(x=Year,y=V1,fill=WIC))+geom_bar(position = "dodge",stat="identity") +theme_light()+
+   labs(y="Number of markets",title = "Number of markets that accept WIC as payment type")+
+   theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16),
+         text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("Payment2.png", device="png", dpi = 1000)
+
+#WICcash
+df<-fmarket[,c(26,60)]
+df<-df[!(is.na(df$started_year)),]
+df<-df[!(df$started_year=="2020"),]
+df<-ddply(df,.(df$started_year,df$WICcash),nrow)
+colnames(df)<-c("Year", "WICcash", "V1")
+df$V1<-ave(df$V1,df$WICcash,FUN=cumsum)
+ggplot(df,aes(x=Year,y=V1,fill=WICcash))+geom_bar(position = "dodge",stat="identity") +
+   labs(y="Number of markets",title = "Number of markets that accept WIC cash as payment type")+theme_light()+
+   theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16),
+         text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("Payment3.png", device="png", dpi = 1000)
+
+#SFMNP
+
+df<-fmarket[,c(27,60)]
+df<-df[!(is.na(df$started_year)),]
+df<-df[!(df$started_year=="2020"),]
+df<-ddply(df,.(df$started_year,df$SFMNP),nrow)
+colnames(df)<-c("Year", "SFMNP", "V1")
+df$V1<-ave(df$V1,df$SFMNP,FUN=cumsum)
+ggplot(df,aes(x=Year,y=V1,fill=SFMNP))+geom_bar(position = "dodge",stat="identity") +
+   labs(y="Number of markets",title = "Number of markets that accept SFMNP as payment type")+theme_light()+
+   theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16),
+         text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("Payment4.png", device="png", dpi = 1000)
+
+# SNAP
+df<-fmarket[,c(28,60)]
+df<-df[!(is.na(df$started_year)),]
+df<-df[!(df$started_year=="2020"),]
+df<-ddply(df,.(df$started_year,df$SNAP),nrow)
+colnames(df)<-c("Year", "SNAP", "V1")
+df$V1<-ave(df$V1,df$SNAP,FUN=cumsum)
+par(mfrow=c(2,2))
+ggplot(df,aes(x=Year,y=V1,fill=SNAP))+geom_bar(position = "dodge",stat="identity") +
+   labs(y="Number of markets",title = "Number of markets that accept SNAP as payment type")+theme_light()+
+   theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16),
+         text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("Payment5.png", device="png", dpi = 1000)
+rm(df)
+```
+
+Distribution of each products across USA
+
+```{r warning=FALSE}
+
+data<-fmarket[,c(11,29:58)]
+out<-list()
+for(i in unique(2:ncol(data))){
+  df1<-data[,c(1,i)]
+  df2<-df1%>%group_by(State)%>%dplyr::summarise_each(function(c) sum(c=="Y"| c=="y"))
+  colnames(df2)<-c("region","times")
+  df2$region<-tolower(df2$region)
+  df3<-full_join(usa_maps,df2)
+  name<-colnames(df1[2])
+out[[i]]<-ggplot(data = df3, aes(x = long, y= lat, group=group))+
+          geom_polygon(aes(fill=times))+ geom_path() + 
+          scale_fill_gradientn(colours = rev(heat.colors(10))) + 
+          labs(title = paste(name)) + coord_fixed(1.5) +
+          theme(axis.text = element_blank(), axis.ticks = element_blank(), 
+                legend.title = element_blank(),
+                axis.line = element_blank(),
+                panel.border = element_blank(),
+                axis.title = element_blank(),
+                legend.key.size = unit(0.3, "cm"),
+                plot.title = element_text(family="Times New Roman", face="bold",color="black",size=10))
+
+}
+grid.arrange(out[[2]],out[[3]],out[[4]],out[[5]],out[[6]],out[[7]],
+             out[[8]],out[[9]],out[[10]],nrow=3,ncol=3)
+ggsave("state1.png", device="png", dpi = 1000)
+grid.arrange(out[[11]],out[[12]],out[[13]],out[[14]],out[[15]],out[[16]],
+             out[[17]],out[[18]],out[[19]],nrow=3,ncol=3)
+ggsave("state2.png", device="png", dpi = 1000)
+grid.arrange(out[[20]],out[[21]],out[[22]],out[[23]],out[[24]],out[[25]],
+             out[[26]],out[[27]],out[[28]],nrow=3,ncol=3)
+ggsave("state3.png", device="png", dpi = 1000)
+grid.arrange(out[[29]],out[[30]],out[[31]],nrow=1,ncol=3)
+ggsave("state4.png", device="png", dpi = 1000)
+
+rm(df1,df2,df3,out)
+```
+
+```{r}
+df<-region[,c(60,13,15,17,19)]
+colnames(df)<-c("Region","Season1","Season2","Season3","Season4")
+season1<-df%>%group_by(Region)%>%
+              dplyr::summarise_each(function(c) sum(c!=""))
+season1
+df1<-melt(season1, id.vars = c("Region"))
+colnames(df1)<-c("Region","Season","value")
+ggplot(df1, aes(x=Region, y = value, fill = Season))+geom_bar(stat = "identity", position = "stack")+
+  labs(title = "Seasons overview",y="Number of markets")+coord_flip()+theme_light()+
+  theme(plot.title = element_text(family="Times New Roman", face="bold.italic",color="black",size=16),
+        text = element_text(family="Times New Roman", face="bold.italic",color="black",size=14))
+
+ggsave("Season1.png", device="png", dpi = 1000)
+
+rm(df,df1)
+
+```
+
+
+
+
+
