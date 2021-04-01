@@ -1,2 +1,2 @@
 # Data-Visualization-on-Farmer's-Market-Data
-Analyzing and cleaning the Farmer's Market using R
+The project focuses on Analyzing, Cleaning and creating detailed report on the findings using R.
